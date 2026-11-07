@@ -54,7 +54,9 @@ completed 时 candidates 只列报告中最多四项主推荐，每项给独立�
 跨提交保持一致；有 Issue/PR 时 identity 设为空字符串。
 没有机会时允许空数组。cutoff 写完整日期、时间和时区；error 保留关键英文错误。
 不要更改目标仓库代码或创建 PR。"""
+        # pr-hint needs GitHub API access; keep file writes scoped to its research directory.
         command = ["codex", "exec", "--skip-git-repo-check", "-s", "workspace-write",
+                   "-c", "sandbox_workspace_write.network_access=true",
                    "--output-schema", str(schema_path),
                    "--output-last-message", str(output_path), "-C", str(folder), prompt]
         try:

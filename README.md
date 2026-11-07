@@ -25,6 +25,8 @@ uv pip install --python .venv/bin/python -e .
    gh auth status
    ```
 
+   GitHub 设备授权页面需要的八位码由 `gh auth login` 显示在这台 Mac 的终端，不会发送到手机；过期后重新运行登录命令获取新码。完整调研需要读取 GitHub Projects V2；若报告出现 `INSUFFICIENT_SCOPES`，先核对 `gh auth status` 中的权限，再由账号持有人运行 `gh auth refresh -h github.com -s read:project` 并在 GitHub 授权页确认。
+
 2. 启用 QQ 邮箱的 SMTP/IMAP，配置同一个发件和收件邮箱。命令会提示输入授权码；不要把授权码写进命令行参数或配置文件：
 
    ```sh

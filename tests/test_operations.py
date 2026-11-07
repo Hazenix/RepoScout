@@ -32,6 +32,7 @@ class OperationsTest(unittest.TestCase):
             self.assertEqual(outcome.state, 'completed')
             command = commands[1]
             self.assertEqual(command[command.index('-s') + 1], 'workspace-write')
+            self.assertEqual(command[command.index('-c') + 1], 'sandbox_workspace_write.network_access=true')
             self.assertIn('$pr-hint', command[-1])
             self.assertIn('全量 GitHub 审查', command[-1])
             self.assertIn('feat > fix > refactor/perf', command[-1])
