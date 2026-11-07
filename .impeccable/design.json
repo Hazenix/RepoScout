@@ -1,0 +1,252 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T02:38:47.028028+00:00",
+  "title": "Design System: RepoScout",
+  "extensions": {
+    "colorMeta": {
+      "warm-paper": {
+        "role": "neutral",
+        "displayName": "暖纸",
+        "tonalRamp": [
+          "#332d19",
+          "#554a2a",
+          "#7a6b3d",
+          "#a38f52",
+          "#bbaa77",
+          "#cfc4a0",
+          "#e2dccb",
+          "#f5f4ef"
+        ]
+      },
+      "warm-surface": {
+        "role": "neutral",
+        "displayName": "暖白",
+        "tonalRamp": [
+          "#4c3d00",
+          "#806600",
+          "#b89300",
+          "#f5c400",
+          "#ffd633",
+          "#ffe270",
+          "#f9ebb4",
+          "#fbf8e9"
+        ]
+      },
+      "deep-ink": {
+        "role": "neutral",
+        "displayName": "深墨绿",
+        "tonalRamp": [
+          "#1a332c",
+          "#2b5449",
+          "#3e7a69",
+          "#53a28c",
+          "#78baa8",
+          "#a1cfc2",
+          "#cbe1db",
+          "#eff5f4"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "灰松绿",
+        "tonalRamp": [
+          "#232a27",
+          "#3a4540",
+          "#54645d",
+          "#70857c",
+          "#90a29a",
+          "#b2beb8",
+          "#d3d9d7",
+          "#f1f3f2"
+        ]
+      },
+      "quiet-line": {
+        "role": "neutral",
+        "displayName": "浅灰绿线",
+        "tonalRamp": [
+          "#252b21",
+          "#3e4838",
+          "#5a6750",
+          "#778a6b",
+          "#96a68c",
+          "#b6c1af",
+          "#d5dbd2",
+          "#f2f3f1"
+        ]
+      },
+      "pine": {
+        "role": "primary",
+        "displayName": "深松绿",
+        "tonalRamp": [
+          "#16362b",
+          "#255a47",
+          "#368267",
+          "#48ad89",
+          "#6fc3a5",
+          "#9ad5c0",
+          "#c8e5da",
+          "#eef6f3"
+        ]
+      },
+      "pine-soft": {
+        "role": "primary",
+        "displayName": "浅松绿",
+        "tonalRamp": [
+          "#1f2e23",
+          "#344c3a",
+          "#4a6d53",
+          "#63926f",
+          "#86ac8f",
+          "#aac5b1",
+          "#d0ddd3",
+          "#f1f4f1"
+        ]
+      },
+      "burnt-orange": {
+        "role": "secondary",
+        "displayName": "赭橙",
+        "tonalRamp": [
+          "#3d1b10",
+          "#652d1a",
+          "#924026",
+          "#c35632",
+          "#d57b5d",
+          "#e2a28d",
+          "#ebccc2",
+          "#f8f0ed"
+        ]
+      },
+      "orange-soft": {
+        "role": "secondary",
+        "displayName": "浅橙",
+        "tonalRamp": [
+          "#392213",
+          "#603920",
+          "#8a522e",
+          "#b86d3d",
+          "#cc8e66",
+          "#dbb094",
+          "#e8d2c5",
+          "#f7f1ee"
+        ]
+      },
+      "focus-orange": {
+        "role": "secondary",
+        "displayName": "焦点橙",
+        "tonalRamp": [
+          "#3e1a0f",
+          "#672b18",
+          "#943d23",
+          "#c6522f",
+          "#d8775a",
+          "#e4a08c",
+          "#eccbc1",
+          "#f8efed"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "页面标题",
+        "purpose": "仅用于页级标题。"
+      },
+      "body": {
+        "displayName": "正文",
+        "purpose": "用于导航、数据、说明与操作。"
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "mobile",
+        "value": "680px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "添加关注时的主要操作。",
+      "html": "<button class=\"ds-primary\">添加关注</button>",
+      "css": ".ds-primary{background:var(--pine,#204d3d);color:#fff;border:1px solid var(--pine,#204d3d);border-radius:8px;padding:8px 14px;min-height:44px;font:700 13px ui-sans-serif,sans-serif;cursor:pointer}.ds-primary:hover{background:#153e30}.ds-primary:focus-visible{outline:3px solid var(--focus,#b54b2b);outline-offset:3px}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "关注推荐仓库的常规操作。",
+      "html": "<button class=\"ds-secondary\">关注</button>",
+      "css": ".ds-secondary{background:var(--pine-soft,#e6eee8);color:var(--pine,#204d3d);border:1px solid transparent;border-radius:8px;padding:8px 14px;min-height:44px;font:700 13px ui-sans-serif,sans-serif;cursor:pointer}.ds-secondary:hover{background:#d9e8dd}.ds-secondary:focus-visible{outline:3px solid var(--focus,#b54b2b);outline-offset:3px}"
+    },
+    {
+      "name": "Subtle Button",
+      "kind": "button",
+      "refersTo": "button-subtle",
+      "description": "忽略、撤销及状态变更的次要操作。",
+      "html": "<button class=\"ds-subtle\">不感兴趣</button>",
+      "css": ".ds-subtle{background:transparent;color:var(--muted,#56665f);border:1px solid var(--line,#d6dcd2);border-radius:8px;padding:8px 14px;min-height:44px;font:700 13px ui-sans-serif,sans-serif;cursor:pointer}.ds-subtle:hover{color:var(--ink,#172d27);border-color:#9eada1}.ds-subtle:focus-visible{outline:3px solid var(--focus,#b54b2b);outline-offset:3px}"
+    },
+    {
+      "name": "Repository URL Input",
+      "kind": "input",
+      "refersTo": "input-repository",
+      "description": "手动添加 GitHub 仓库 URL。",
+      "html": "<input class=\"ds-repo-input\" aria-label=\"添加 GitHub 仓库\" placeholder=\"https://github.com/owner/repo\">",
+      "css": ".ds-repo-input{background:var(--surface,#fffefa);color:var(--ink,#172d27);border:1px solid #a8b8aa;border-radius:7px;padding:10px 13px;min-height:44px;font:16px ui-sans-serif,sans-serif}.ds-repo-input::placeholder{color:#56665f}.ds-repo-input:focus-visible{outline:3px solid var(--focus,#b54b2b);outline-offset:3px}"
+    },
+    {
+      "name": "Active Tab",
+      "kind": "nav",
+      "description": "三个主视图的当前状态。",
+      "html": "<nav class=\"ds-tabs\"><button class=\"ds-tab\">Trending 待决定 <span>2</span></button></nav>",
+      "css": ".ds-tabs{border-bottom:1px solid var(--line,#d6dcd2)}.ds-tab{background:transparent;color:var(--pine,#204d3d);border:0;border-bottom:2px solid var(--pine,#204d3d);padding:15px 20px 14px 0;font:650 14px ui-sans-serif,sans-serif;cursor:pointer}.ds-tab span{color:var(--orange,#a3482a)}.ds-tab:hover{color:var(--ink,#172d27)}.ds-tab:focus-visible{outline:3px solid var(--focus,#b54b2b);outline-offset:3px}"
+    },
+    {
+      "name": "Review Status",
+      "kind": "chip",
+      "refersTo": "badge-status",
+      "description": "用文字与淡色面共同表达仓库审查状态。",
+      "html": "<span class=\"ds-status\">已完成</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;background:#e3f0e5;color:#1f6240;border-radius:100px;padding:4px 9px;font:700 11px ui-sans-serif,sans-serif;line-height:1.3}"
+    }
+  ],
+  "narrative": {
+    "northStar": "开源研究田野笔记",
+    "overview": "RepoScout 是供一人反复核对仓库、审查状态和机会历史的工作台。暖纸底与细线分隔形成安静的阅读面；深松绿标识可行动的信息，少量赭橙标记序号、计数和需要留意的状态。信息密度来自清晰的行、标题、时间与状态关系，不靠装饰制造层级。",
+    "keyCharacteristics": [
+      "暖纸色底、近白内容面、细线分隔；静态列表默认平面呈现。",
+      "松绿承担链接、当前 tabs 和主要操作；赭橙仅作辅助标记与错误提示。",
+      "仓库与机会按行扫描，状态徽章和报告链接紧邻对象。"
+    ],
+    "rules": [
+      {
+        "name": "The Two Accent Rule",
+        "body": "松绿表达当前路径与可行动信息；赭橙只为计数、序号、异常及焦点提供第二层提示。",
+        "section": "colors"
+      },
+      {
+        "name": "The One Serif Rule",
+        "body": "衬线用于页标题，导航、链接、状态和操作维持统一的系统无衬线字体。",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Ledger Rule",
+        "body": "仓库与机会保持平面行式记录；只有输入区、空状态和通知需要独立色面。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "用细线、字重和留白划分记录，保留列表的快速扫描感。",
+      "让状态文字与报告链接紧靠所属仓库或机会，并保留历史与本轮的区分。",
+      "在窄屏把动作放到记录内容之后，维持至少 44px 的触控高度。"
+    ],
+    "donts": [
+      "把每条记录包装成悬浮卡片或加入阴影。",
+      "把赭橙扩展成主要按钮或大面积底色。",
+      "只凭颜色传达已完成、待复核、失败或未完成等状态。"
+    ]
+  }
+}

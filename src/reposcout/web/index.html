@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>RepoScout · 开源机会看板</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="site-head">
+      <div class="brand"><span class="brand-mark" aria-hidden="true"></span><span>RepoScout</span></div>
+      <p class="site-description">开源机会，在一处认真看完。</p>
+      <div id="scan-indicator" class="scan-indicator" role="status"></div>
+    </header>
+    <main>
+      <div class="page-head">
+        <div><h1>今日工作台</h1><p id="page-subtitle">正在读取本机记录…</p><p id="mail-subtitle" class="mail-subtitle"></p></div>
+        <div id="date-label" class="date-label"></div>
+      </div>
+      <nav class="tabs" aria-label="看板视图">
+        <button type="button" data-tab="trending" aria-current="page">Trending 待决定 <span id="trending-count"></span></button>
+        <button type="button" data-tab="following">已关注仓库 <span id="following-count"></span></button>
+        <button type="button" data-tab="opportunities">PR 机会 <span id="opportunity-count"></span></button>
+      </nav>
+      <div id="notice" class="notice" role="status" aria-live="polite" tabindex="-1" hidden></div>
+      <section id="trending-view" class="view" aria-labelledby="trending-title">
+        <div class="section-head"><div><h2 id="trending-title">今天值得看一眼</h2><p>全语言今日 Trending，保留榜单顺序；只列尚未推送的新仓库。</p></div><span class="meta">最多 10 个</span></div>
+        <div id="trending-list" class="list"></div>
+        <div id="sent-pending-section" class="secondary-section" hidden><h3>已推送，待决定</h3><p>这些仓库已经出现在邮件中，仍可在这里关注或标记不感兴趣。</p><div id="sent-pending-list" class="list"></div></div>
+        <div class="secondary-section"><h3>已标记不感兴趣</h3><p>误点后可以撤销，仓库会重新进入可推荐范围。</p><div id="ignored-list" class="compact-list"></div></div>
+      </section>
+      <section id="following-view" class="view" aria-labelledby="following-title" hidden>
+        <div class="section-head"><div><h2 id="following-title">持续关注的仓库</h2><p>每天完整审查；取消关注后，历史报告和机会仍保留。</p></div></div>
+        <form id="add-form" class="add-form"><label for="repo-url">添加 GitHub 仓库</label><div><input id="repo-url" name="repo-url" type="url" inputmode="url" placeholder="https://github.com/owner/repo" required><button type="submit" class="primary">添加关注</button></div></form>
+        <div id="following-list" class="list"></div>
+        <div class="secondary-section"><h3>最近扫描</h3><p>查看最近 30 次运行的时间、逐库状态和完整报告；近 30 天的缺失日期也会标出。</p><div id="scan-history" class="scan-history"></div></div>
+      </section>
+      <section id="opportunities-view" class="view" aria-labelledby="opportunities-title" hidden>
+        <div class="section-head"><div><h2 id="opportunities-title">PR 机会</h2><p>按仓库查看完整报告与历史；旧结论在新审查前标记待复核。</p></div></div>
+        <div id="opportunity-list"></div>
+      </section>
+    </main>
+    <footer>数据保存在这台 Mac 上 · 关注操作不会改变 GitHub Watch 或 Star</footer>
+  </div>
+</body>
+</html>

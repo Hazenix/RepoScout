@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reposcout"
+version = "0.1.0"
+description = "本机开源 PR 机会看板"
+requires-python = ">=3.11"
+
+[project.scripts]
+reposcout = "reposcout.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+reposcout = ["web/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
