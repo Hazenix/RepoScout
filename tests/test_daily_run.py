@@ -1,10 +1,12 @@
+import subprocess
 import tempfile
 import unittest
 from datetime import datetime
 from pathlib import Path
+from unittest.mock import patch
 
 from reposcout.core import (
-    Candidate, DefinitiveMailError, ReviewOutcome, Store, ZONE, deliver, parse_trending,
+    Candidate, DefinitiveMailError, ReviewOutcome, Store, ZONE, deliver, fetch_trending, parse_trending,
     reconcile_delivery, restore_backup, run_day, tick,
 )
 
@@ -188,6 +190,15 @@ class DailyRunTest(unittest.TestCase):
         self.assertIn("HTTP 429", view["scan"]["trending_error"])
         self.assertEqual(view["trending"], [])
         self.assertEqual(view["ignored"][0]["slug"], "old/ignored")
+
+    def test_trending_failure_keeps_curl_error_for_board_diagnosis(self):
+        curl_error = subprocess.CalledProcessError(
+            56, ["curl", "https://github.com/trending?since=daily"],
+            stderr="curl: (56) The requested URL returned error: 504")
+        with patch("subprocess.run", side_effect=curl_error):
+            view = run_day(self.store, fetch_trending, lambda slug, day: complete(), DAY)
+        self.assertIn("curl: (56) The requested URL returned error: 504",
+                      view["scan"]["trending_error"])
 
     def test_delayed_send_and_smtp_uncertainty(self):
         def later(): return datetime(2026, 11, 6, 19, 0, tzinfo=ZONE)

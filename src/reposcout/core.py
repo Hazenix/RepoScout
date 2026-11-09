@@ -167,11 +167,15 @@ def parse_trending(html: str) -> list[tuple[str, str]]:
 
 def fetch_trending() -> list[tuple[str, str]]:
     import subprocess
-    response = subprocess.run(
-        ["curl", "--fail", "--location", "--retry", "2", "--max-time", "40",
-         "--silent", "--show-error", "--user-agent", "RepoScout/0.1",
-         "https://github.com/trending?since=daily"],
-        capture_output=True, text=True, check=True)
+    try:
+        response = subprocess.run(
+            ["curl", "--fail", "--location", "--retry", "2", "--max-time", "40",
+             "--silent", "--show-error", "--user-agent", "RepoScout/0.1",
+             "https://github.com/trending?since=daily"],
+            capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        # curl 的 HTTP 错误详情在 stderr，默认异常文案只包含退出码。
+        raise RuntimeError((exc.stderr or "").strip() or str(exc)) from exc
     return parse_trending(response.stdout)
 
 
