@@ -365,7 +365,7 @@ class Store:
         staging = target.with_name(target.name + ".partial")
         if staging.exists():
             raise FileExistsError(staging)
-        staging.mkdir(parents=True)
+        staging.mkdir(parents=True, mode=0o700)
         try:
             with self.connect() as src, sqlite3.connect(staging / "reposcout.db") as dst:
                 src.backup(dst)

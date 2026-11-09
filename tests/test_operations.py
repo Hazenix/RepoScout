@@ -1,6 +1,7 @@
 import plistlib
 import json
 import os
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -93,6 +94,7 @@ class OperationsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             store = Store(Path(root) / 'data')
             backup = store.backup(Path(root) / 'backup')
+            self.assertEqual(stat.S_IMODE(backup.stat().st_mode), 0o700)
             verify_backup(backup)
             existing = Path(root) / 'existing'
             existing.mkdir()
