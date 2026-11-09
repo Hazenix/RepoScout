@@ -455,17 +455,19 @@ def run_day(store: Store, trending_reader: TrendingReader, reviewer: ReviewRunne
         db.execute("UPDATE scans SET state='partial', finished_at=? WHERE day<? AND state='running'",
                    (_timestamp(moment), day))
         existing = db.execute("SELECT * FROM scans WHERE day=?", (day,)).fetchone()
-        if existing and existing["state"] in ("completed", "partial"):
+        delivery_started = db.execute("SELECT 1 FROM deliveries WHERE day=?", (day,)).fetchone() is not None
+        if existing and existing["state"] in ("completed", "partial") and (existing["trending_state"] != "failed" or delivery_started):
             return store.view(day)
         if not existing:
             db.execute("INSERT INTO scans(day,started_at,catch_up,state,trending_state) VALUES (?,?,?,'running','pending')",
                        (day, _timestamp(moment), int(catch_up)))
             slugs = [row[0] for row in db.execute("SELECT slug FROM repositories WHERE followed=1 ORDER BY added_at,slug")]
             db.executemany("INSERT INTO repo_runs(day,slug,state) VALUES (?,?,'pending')", ((day, slug) for slug in slugs))
-        else:
+        elif existing["state"] == "running":
             db.execute("UPDATE repo_runs SET state='incomplete', error='进程中断；本日不重复运行' WHERE day=? AND state='running'", (day,))
         trending_state = db.execute("SELECT trending_state FROM scans WHERE day=?", (day,)).fetchone()[0]
-    if trending_state == "pending":
+    # 同日重试失败的榜单，不重复已完成的仓库审查。
+    if trending_state in ("pending", "failed"):
         try:
             snapshot = trending_reader()
             with store.connect() as db:
@@ -475,7 +477,7 @@ def run_day(store: Store, trending_reader: TrendingReader, reviewer: ReviewRunne
                 selected = db.execute(ELIGIBLE_TRENDING_SQL, (day,)).fetchall()
                 db.executemany("INSERT INTO recommendation_items(day,slug) VALUES (?,?)",
                                ((day, row["slug"]) for row in selected))
-                db.execute("UPDATE scans SET trending_state='completed' WHERE day=?", (day,))
+                db.execute("UPDATE scans SET trending_state='completed', trending_error='' WHERE day=?", (day,))
         except Exception as exc:
             with store.connect() as db:
                 db.execute("UPDATE scans SET trending_state='failed', trending_error=? WHERE day=?", (f"{type(exc).__name__}: {exc}", day))
@@ -627,10 +629,17 @@ def tick(store: Store, trending_reader: TrendingReader, reviewer: ReviewRunner,
     if moment.time() < time(13):
         return "before_scan_window"
     run_day(store, trending_reader, reviewer, moment, catch_up, deadline)
+    completed_at = finished_at()
+    # 邮件只发一封：若审查拖到 18:00 后，先重试失败的榜单，再冻结邮件内容。
+    if moment.time() < time(18) and completed_at.date() == moment.date() and completed_at.time() >= time(18):
+        with store.connect() as db:
+            trending_failed = db.execute("SELECT trending_state='failed' FROM scans WHERE day=?", (moment.date().isoformat(),)).fetchone()[0]
+        if trending_failed:
+            run_day(store, trending_reader, reviewer, moment, catch_up, deadline)
     with store.connect() as db:
         failed_days = [row[0] for row in db.execute("SELECT day FROM deliveries WHERE day<? AND status='failed' ORDER BY day", (moment.date().isoformat(),))]
-    retry_results = [deliver(store, sender, finished_at(), day) for day in failed_days]
-    current_result = deliver(store, sender, finished_at(), moment.date().isoformat())
+    retry_results = [deliver(store, sender, completed_at, day) for day in failed_days]
+    current_result = deliver(store, sender, completed_at, moment.date().isoformat())
     if current_result != "nothing_pending":
         return current_result
     if "failed" in retry_results:

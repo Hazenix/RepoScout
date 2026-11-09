@@ -200,6 +200,77 @@ class DailyRunTest(unittest.TestCase):
         self.assertIn("curl: (56) The requested URL returned error: 504",
                       view["scan"]["trending_error"])
 
+    def test_evening_tick_retries_failed_trending_without_repeating_reviews(self):
+        reads = []
+        reviews = []
+        messages = []
+        def trending_reader():
+            reads.append(True)
+            if len(reads) == 1:
+                raise RuntimeError("HTTP 504")
+            return [("acme/new", "恢复后的今日榜单")]
+        def reviewer(slug, day):
+            reviews.append(slug)
+            return complete()
+        self.assertEqual(tick(self.store, trending_reader, reviewer,
+                              lambda *args: messages.append(args), DAY,
+                              finished_at=lambda: DAY), "before_send_window")
+        self.assertEqual(self.store.view(DAY.date().isoformat())["scan"]["trending_state"], "failed")
+        self.assertEqual(tick(self.store, trending_reader, reviewer,
+                              lambda *args: messages.append(args), EVENING,
+                              finished_at=lambda: EVENING), "sent")
+        view = self.store.view(DAY.date().isoformat())
+        self.assertEqual(len(reads), 2)
+        self.assertEqual(len(reviews), 4)
+        self.assertEqual(view["scan"]["state"], "completed")
+        self.assertEqual(view["scan"]["trending_error"], "")
+        self.assertEqual(len(view["scan_history"]), 1)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("https://github.com/acme/new", messages[0][1])
+
+    def test_late_review_retries_trending_before_freezing_one_email(self):
+        candidate = Candidate("新机会", "https://github.com/earendil-works/pi/issues/42", "已核验", "fix")
+        reads = []
+        reviews = []
+        messages = []
+        def trending_reader():
+            reads.append(True)
+            if len(reads) == 1:
+                raise RuntimeError("HTTP 504")
+            return [("acme/new", "恢复后的今日榜单")]
+        def reviewer(slug, day):
+            reviews.append(slug)
+            return complete(candidate) if slug == "earendil-works/pi" else complete()
+        late = datetime(2026, 11, 6, 19, tzinfo=ZONE)
+        self.assertEqual(tick(self.store, trending_reader, reviewer,
+                              lambda *args: messages.append(args), DAY,
+                              finished_at=lambda: late), "sent")
+        self.assertEqual(len(reads), 2)
+        self.assertEqual(len(reviews), 4)
+        self.assertEqual(len(messages), 1)
+        self.assertIn("https://github.com/acme/new", messages[0][1])
+        self.assertIn("https://github.com/earendil-works/pi/issues/42", messages[0][1])
+
+    def test_sent_partial_email_does_not_reveal_unmailed_trending_later(self):
+        candidate = Candidate("新机会", "https://github.com/earendil-works/pi/issues/42", "已核验", "fix")
+        reads = []
+        def trending_reader():
+            reads.append(True)
+            if len(reads) <= 2:
+                raise RuntimeError("HTTP 504")
+            return [("acme/late", "邮件之后才恢复")]
+        late = datetime(2026, 11, 6, 19, tzinfo=ZONE)
+        self.assertEqual(tick(self.store, trending_reader,
+                              lambda slug, day: complete(candidate) if slug == "earendil-works/pi" else complete(),
+                              lambda *args: None, DAY, finished_at=lambda: late), "sent")
+        self.assertEqual(tick(self.store, trending_reader, lambda slug, day: self.fail("review rerun"),
+                              lambda *args: self.fail("duplicate mail"), late,
+                              finished_at=lambda: late), "nothing_pending")
+        self.assertEqual(len(reads), 2)
+        view = self.store.view(DAY.date().isoformat())
+        self.assertEqual(view["scan"]["trending_state"], "failed")
+        self.assertEqual(view["trending"], [])
+
     def test_delayed_send_and_smtp_uncertainty(self):
         def later(): return datetime(2026, 11, 6, 19, 0, tzinfo=ZONE)
         sent = []
