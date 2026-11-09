@@ -5,7 +5,9 @@ import argparse
 import fcntl
 import os
 import plistlib
+import shutil
 import sys
+import tempfile
 import time as time_module
 from contextlib import contextmanager
 from datetime import time, timedelta
@@ -32,7 +34,36 @@ def task_lock(data_dir: Path):
 
 
 def launchd_plists(python: Path, data_dir: Path) -> dict[str, bytes]:
-    common: dict[str, object] = {"EnvironmentVariables": {"PATH": os.environ.get("PATH", "/opt/homebrew/bin:/usr/bin:/bin")},
+    # Do not carry session wrappers into launchd; keep symlink entry points so upgrades remain visible.
+    transient_roots = (Path(tempfile.gettempdir()), Path("/tmp"), Path("/var/tmp"),
+                       Path("/var/folders"), Path("/var/run"),
+                       Path.home() / ".codex/tmp", Path.home() / ".cache/codex-runtimes",
+                       Path("/pkg/env"))
+    def persistent(directory: Path) -> bool:
+        if not directory.is_absolute():
+            return False
+        resolved = directory.resolve()
+        return not any(resolved.is_relative_to(root.resolve()) for root in transient_roots)
+
+    defaults = (Path.home() / ".local/bin", Path("/opt/homebrew/bin"), Path("/opt/homebrew/sbin"),
+                Path("/usr/local/bin"), Path("/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS"),
+                Path("/usr/bin"), Path("/bin"), Path("/usr/sbin"), Path("/sbin"))
+    search_dirs = [str(directory) for directory in defaults]
+    for entry in os.environ.get("PATH", "").split(os.pathsep):
+        if not entry:
+            continue
+        directory = Path(entry)
+        if persistent(directory):
+            search_dirs.append(str(directory))
+    search_path = os.pathsep.join(dict.fromkeys(search_dirs))
+    tool_dirs = []
+    for tool in ("codex", "gh"):
+        executable = shutil.which(tool, path=search_path)
+        if not executable or not persistent(Path(executable).parent):
+            raise FileNotFoundError(f"launchd 配置缺少稳定的可执行文件: {tool}")
+        tool_dirs.append(str(Path(executable).parent))
+    launchd_path = os.pathsep.join(dict.fromkeys(tool_dirs + [str(directory) for directory in defaults]))
+    common: dict[str, object] = {"EnvironmentVariables": {"PATH": launchd_path},
               "StandardOutPath": str(data_dir / "launchd.log"),
               "StandardErrorPath": str(data_dir / "launchd-error.log")}
     prefix = [str(python), "-m", "reposcout.cli", "--data-dir", str(data_dir)]

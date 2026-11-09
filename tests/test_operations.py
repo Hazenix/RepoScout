@@ -1,5 +1,6 @@
 import plistlib
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -39,12 +40,44 @@ class OperationsTest(unittest.TestCase):
             self.assertIn('最多 4', command[-1])
 
     def test_launchd_has_startup_board_and_two_daily_times(self):
-        jobs = {name: plistlib.loads(data) for name, data in launchd_plists(Path('/usr/bin/python3'), Path('/tmp/reposcout')).items()}
+        searches = []
+        def locate(name, path=None):
+            searches.append(path)
+            return {
+                'codex': '/Applications/ChatGPT.app/Contents/MacOS/codex',
+                'gh': '/opt/homebrew/bin/gh',
+            }[name]
+        with patch.dict(os.environ, {'PATH': '/tmp/codex-session:/usr/bin'}), \
+             patch('reposcout.cli.shutil.which', side_effect=locate):
+            jobs = {name: plistlib.loads(data) for name, data in launchd_plists(Path('/usr/bin/python3'), Path('/tmp/reposcout')).items()}
         self.assertEqual(set(jobs), {'board', 'startup', 'daily'})
         self.assertTrue(jobs['startup']['RunAtLoad'])
         self.assertTrue(jobs['board']['KeepAlive'])
         self.assertEqual(jobs['daily']['StartCalendarInterval'],
                          [{'Hour': 13, 'Minute': 0}, {'Hour': 18, 'Minute': 0}])
+        launchd_path = jobs['daily']['EnvironmentVariables']['PATH']
+        self.assertIn('/Applications/ChatGPT.app/Contents/MacOS', launchd_path)
+        self.assertIn('/opt/homebrew/bin', launchd_path)
+        self.assertNotIn('/tmp/codex-session', launchd_path)
+        self.assertTrue(all(path and '/tmp/codex-session' not in path for path in searches))
+
+    def test_launchd_keeps_symlink_entry_directory_for_upgrades(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as root:
+            root = Path(root)
+            stable = root / 'stable'
+            version = root / 'version'
+            stable.mkdir()
+            version.mkdir()
+            (version / 'gh').write_text('binary', encoding='utf-8')
+            (stable / 'gh').symlink_to(version / 'gh')
+            with patch('reposcout.cli.shutil.which', side_effect=lambda name, path=None: {
+                'codex': '/Applications/ChatGPT.app/Contents/MacOS/codex',
+                'gh': str(stable / 'gh'),
+            }[name]):
+                jobs = launchd_plists(Path('/usr/bin/python3'), root)
+            path = plistlib.loads(jobs['daily'])['EnvironmentVariables']['PATH'].split(os.pathsep)
+            self.assertIn(str(stable), path)
+            self.assertNotIn(str(version), path)
 
     def test_before_thirteen_does_not_scan(self):
         with tempfile.TemporaryDirectory() as root:
