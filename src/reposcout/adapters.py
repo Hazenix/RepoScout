@@ -106,6 +106,8 @@ class QQSender:
         message["To"] = self.address
         message["Subject"] = subject
         message["Message-ID"] = message_id
+        # QQ SMTP rewrites Message-ID; this header survives and is searchable over IMAP.
+        message["X-RepoScout-ID"] = message_id.strip("<>")
         message.set_content(body, charset="utf-8")
         try:
             with smtplib.SMTP_SSL("smtp.qq.com", 465, timeout=30) as smtp:
@@ -115,13 +117,13 @@ class QQSender:
             raise DefinitiveMailError(f"{type(exc).__name__}: {exc}") from exc
 
     def received(self, message_id: str) -> bool:
-        """Check the configured mailbox for the exact Message-ID after a test send."""
+        """Check the configured mailbox for the stable RepoScout delivery marker."""
         with imaplib.IMAP4_SSL("imap.qq.com", 993, timeout=30) as mailbox:
             mailbox.login(self.address, self._authorization_code())
             status, _ = mailbox.select("INBOX", readonly=True)
             if status != "OK":
                 raise RuntimeError(f"IMAP select failed: {status}")
-            status, ids = mailbox.search(None, "HEADER", "Message-ID", f'"{message_id}"')
+            status, ids = mailbox.search(None, "HEADER", "X-RepoScout-ID", f'"{message_id.strip("<>")}"')
             if status != "OK":
                 raise RuntimeError(f"IMAP search failed: {status}")
             return bool(ids and ids[0])

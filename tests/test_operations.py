@@ -9,12 +9,82 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
-from reposcout.adapters import CodexReviewer
-from reposcout.cli import launchd_plists
+from reposcout.adapters import CodexReviewer, QQSender
+from reposcout.cli import launchd_plists, wait_for_receipt
 from reposcout.core import Store, ZONE, restore_backup, tick, verify_backup
 
 
 class OperationsTest(unittest.TestCase):
+    def test_mail_receipt_retries_temporary_imap_failure_within_deadline(self):
+        moment = [0.0]
+        attempts = []
+
+        def received(message_id):
+            attempts.append(message_id)
+            if len(attempts) == 1:
+                raise TimeoutError("temporary IMAP timeout")
+            return len(attempts) == 3
+
+        def sleep(seconds):
+            moment[0] += seconds
+
+        with patch('reposcout.cli.time_module.monotonic', side_effect=lambda: moment[0]), \
+             patch('reposcout.cli.time_module.sleep', side_effect=sleep):
+            self.assertTrue(wait_for_receipt(received, '<test@localhost>', timeout=12))
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(moment[0], 10)
+
+    def test_mail_receipt_stops_at_deadline(self):
+        moment = [0.0]
+
+        def sleep(seconds):
+            moment[0] += seconds
+
+        with patch('reposcout.cli.time_module.monotonic', side_effect=lambda: moment[0]), \
+             patch('reposcout.cli.time_module.sleep', side_effect=sleep):
+            self.assertFalse(wait_for_receipt(lambda _: False, '<test@localhost>', timeout=12))
+        self.assertEqual(moment[0], 12)
+
+    def test_mail_receipt_keeps_error_when_every_imap_query_fails(self):
+        moment = [0.0]
+
+        def fail(_):
+            raise TimeoutError("IMAP connection timed out")
+
+        def sleep(seconds):
+            moment[0] += seconds
+
+        with patch('reposcout.cli.time_module.monotonic', side_effect=lambda: moment[0]), \
+             patch('reposcout.cli.time_module.sleep', side_effect=sleep):
+            with self.assertRaisesRegex(RuntimeError, 'TimeoutError: IMAP connection timed out'):
+                wait_for_receipt(fail, '<test@localhost>', timeout=6)
+        self.assertEqual(moment[0], 6)
+
+    def test_qq_receipt_uses_preserved_correlation_header(self):
+        sent = []
+        searches = []
+        class SMTP:
+            def __enter__(self): return self
+            def __exit__(self, *_): return None
+            def login(self, *_): return None
+            def send_message(self, message): sent.append(message)
+        class IMAP:
+            def __enter__(self): return self
+            def __exit__(self, *_): return None
+            def login(self, *_): return None
+            def select(self, *_ , **__): return 'OK', [b'1']
+            def search(self, *args):
+                searches.append(args)
+                return 'OK', [b'42' if args == (None, 'HEADER', 'X-RepoScout-ID', '"reposcout.test.123@localhost"') else b'']
+        sender = QQSender('example@qq.com')
+        with patch.object(sender, '_authorization_code', return_value='placeholder'), \
+             patch('reposcout.adapters.smtplib.SMTP_SSL', return_value=SMTP()), \
+             patch('reposcout.adapters.imaplib.IMAP4_SSL', return_value=IMAP()):
+            sender('测试', '正文', '<reposcout.test.123@localhost>')
+            self.assertTrue(sender.received('<reposcout.test.123@localhost>'))
+        self.assertEqual(sent[0]['X-RepoScout-ID'], 'reposcout.test.123@localhost')
+        self.assertEqual(searches[-1][2], 'X-RepoScout-ID')
+
     def test_codex_adapter_invokes_pr_hint_with_fixed_scope_and_only_completed_output(self):
         with tempfile.TemporaryDirectory() as root:
             commands = []

@@ -12,6 +12,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, Protocol
 from urllib.parse import urlparse
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 ZONE = ZoneInfo("Asia/Shanghai")
@@ -566,7 +567,7 @@ def prepare_delivery(store: Store, day: str) -> tuple[str, str, str] | None:
             lines.append("本日无新机会。")
         body = "\n".join(lines).strip() + "\n"
         subject = f"RepoScout 日报 · {day}"
-        message_id = f"<reposcout.{day}@localhost>"
+        message_id = f"<reposcout.{day}.{uuid4().hex}@localhost>"
         db.execute("INSERT INTO deliveries(day,status,message_id,subject,body) VALUES (?,'pending',?,?,?)",
                    (day, message_id, subject, body))
         db.executemany("INSERT INTO delivery_items VALUES (?,'repo',?)", ((day, row["slug"]) for row in repos))

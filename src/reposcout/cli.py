@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import imaplib
 import os
 import plistlib
 import shutil
@@ -12,6 +13,8 @@ import time as time_module
 from contextlib import contextmanager
 from datetime import time, timedelta
 from pathlib import Path
+from typing import Callable
+from uuid import uuid4
 
 from .adapters import CodexReviewer, QQSender, configure_keychain
 from .core import Store, fetch_trending, now_cn, reconcile_delivery, restore_backup, tick, verify_backup
@@ -20,6 +23,26 @@ from .server import serve
 
 def default_data_dir() -> Path:
     return Path(os.environ.get("REPOSCOUT_HOME", "~/Library/Application Support/RepoScout")).expanduser()
+
+
+def wait_for_receipt(received: Callable[[str], bool], message_id: str, timeout: float = 180) -> bool:
+    deadline = time_module.monotonic() + timeout
+    checked = False
+    last_error: OSError | imaplib.IMAP4.abort | None = None
+    while True:
+        try:
+            if received(message_id):
+                return True
+            checked = True
+        except (OSError, imaplib.IMAP4.abort) as exc:
+            # A temporary IMAP connection failure does not undo SMTP acceptance.
+            last_error = exc
+        remaining = deadline - time_module.monotonic()
+        if remaining <= 0:
+            if not checked and last_error is not None:
+                raise RuntimeError(f"IMAP 查询持续失败: {type(last_error).__name__}: {last_error}") from last_error
+            return False
+        time_module.sleep(min(5, remaining))
 
 
 @contextmanager
@@ -133,15 +156,11 @@ def main() -> None:
         print("邮箱地址与钥匙串已配置")
     elif args.command == "test-mail":
         sender = QQSender(store.get_setting("mail_address"))
-        message_id = f"<reposcout.test.{int(time_module.time())}@localhost>"
+        message_id = f"<reposcout.test.{uuid4().hex}@localhost>"
         sender("RepoScout 测试邮件", "这是一封本机集成检查邮件。\n", message_id)
-        for _ in range(6):
-            if sender.received(message_id):
-                print("SMTP 已接受，IMAP 已核对收件")
-                break
-            time_module.sleep(5)
-        else:
-            raise RuntimeError("SMTP 已接受，但 30 秒内 IMAP 未查到测试邮件；收件未验证")
+        if not wait_for_receipt(sender.received, message_id):
+            raise RuntimeError("SMTP 已接受，但约 3 分钟内 IMAP 未查到测试邮件；收件未验证")
+        print("SMTP 已接受，IMAP 已核对收件")
     elif args.command == "reconcile-mail":
         sender = QQSender(store.get_setting("mail_address"))
         print(reconcile_delivery(store, sender.received, args.day))
