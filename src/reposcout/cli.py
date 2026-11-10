@@ -27,20 +27,19 @@ def default_data_dir() -> Path:
 
 def wait_for_receipt(received: Callable[[str], bool], message_id: str, timeout: float = 180) -> bool:
     deadline = time_module.monotonic() + timeout
-    checked = False
     last_error: OSError | imaplib.IMAP4.abort | None = None
     while True:
         try:
             if received(message_id):
                 return True
-            checked = True
+            last_error = None
         except (OSError, imaplib.IMAP4.abort) as exc:
             # A temporary IMAP connection failure does not undo SMTP acceptance.
             last_error = exc
         remaining = deadline - time_module.monotonic()
         if remaining <= 0:
-            if not checked and last_error is not None:
-                raise RuntimeError(f"IMAP 查询持续失败: {type(last_error).__name__}: {last_error}") from last_error
+            if last_error is not None:
+                raise RuntimeError(f"IMAP 最近一次查询失败: {type(last_error).__name__}: {last_error}") from last_error
             return False
         time_module.sleep(min(5, remaining))
 

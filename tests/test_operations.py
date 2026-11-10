@@ -60,6 +60,25 @@ class OperationsTest(unittest.TestCase):
                 wait_for_receipt(fail, '<test@localhost>', timeout=6)
         self.assertEqual(moment[0], 6)
 
+    def test_mail_receipt_keeps_last_error_after_earlier_empty_search(self):
+        moment = [0.0]
+        attempts = [0]
+
+        def received(_):
+            attempts[0] += 1
+            if attempts[0] == 1:
+                return False
+            raise TimeoutError("IMAP connection timed out")
+
+        def sleep(seconds):
+            moment[0] += seconds
+
+        with patch('reposcout.cli.time_module.monotonic', side_effect=lambda: moment[0]), \
+             patch('reposcout.cli.time_module.sleep', side_effect=sleep):
+            with self.assertRaisesRegex(RuntimeError, 'TimeoutError: IMAP connection timed out'):
+                wait_for_receipt(received, '<test@localhost>', timeout=6)
+        self.assertEqual(moment[0], 6)
+
     def test_qq_receipt_uses_preserved_correlation_header(self):
         sent = []
         searches = []
