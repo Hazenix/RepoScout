@@ -5,6 +5,7 @@ import json
 import imaplib
 import smtplib
 import subprocess
+import time
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -35,7 +36,11 @@ class CodexReviewer:
     def __call__(self, slug: str, day: str) -> ReviewOutcome:
         auth = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=30)
         if auth.returncode:
-            return ReviewOutcome("failed", error="gh auth status: GitHub CLI is not authenticated")
+            # 定时任务出现过单次认证检查失败、随后检查成功；重试一次再判定仓库失败。
+            time.sleep(2)
+            auth = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=30)
+            if auth.returncode:
+                return ReviewOutcome("failed", error=f"gh auth status exited {auth.returncode} after retry")
         folder = self.research_dir / day / slug.replace("/", "__")
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
         schema_path = folder / "outcome-schema.json"

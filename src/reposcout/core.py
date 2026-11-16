@@ -39,6 +39,14 @@ PENDING_TRENDING_SQL = """
         WHERE di.kind='repo' AND di.item_id=t.slug AND d.status='sent')
     ORDER BY t.position
 """
+PENDING_OPPORTUNITIES_SQL = """
+    SELECT o.* FROM opportunities o
+    WHERE o.historical=0 AND o.status='current' AND o.last_seen=?
+    AND EXISTS (SELECT 1 FROM repo_runs rr WHERE rr.day=o.last_seen AND rr.slug=o.slug AND rr.state='completed')
+    AND NOT EXISTS (SELECT 1 FROM delivery_items di JOIN deliveries d ON d.day=di.day
+        WHERE di.kind='opportunity' AND di.item_id=o.id AND d.status='sent')
+    ORDER BY o.slug, o.first_seen, o.id
+"""
 
 
 def now_cn() -> datetime:
@@ -299,6 +307,7 @@ class Store:
             opportunities = [dict(row) for row in db.execute("SELECT * FROM opportunities ORDER BY slug, first_seen DESC")]
             history = [dict(row) for row in db.execute("SELECT * FROM historical_reports ORDER BY slug")]
             trending = [dict(row) for row in db.execute(PENDING_TRENDING_SQL, (day,))]
+            pending_mail_items = len(trending) + len(db.execute(PENDING_OPPORTUNITIES_SQL, (day,)).fetchall())
             sent_pending = [dict(row) for row in db.execute("""
                 SELECT di.item_id AS slug, MAX(di.day) AS sent_day,
                     COALESCE((SELECT t.description FROM trending t WHERE t.slug=di.item_id
@@ -317,7 +326,8 @@ class Store:
                 "latest_scan": dict(latest) if latest else None, "runs": runs, "history": history,
                 "scan_history": scan_history, "run_history": run_history,
                 "missing_days": missing_days,
-                "delivery": dict(delivery) if delivery else None}
+                "delivery": dict(delivery) if delivery else None,
+                "pending_mail_items": pending_mail_items}
 
     def _save_report(self, day: str, slug: str, outcome: ReviewOutcome) -> tuple[str, str]:
         folder = self.reports / day / slug.replace("/", "__")
@@ -542,12 +552,7 @@ def prepare_delivery(store: Store, day: str) -> tuple[str, str, str] | None:
         if not scan or scan[0] not in ("completed", "partial"):
             return None
         repos = db.execute(PENDING_TRENDING_SQL, (day,)).fetchall()
-        items = db.execute("""SELECT o.* FROM opportunities o
-            WHERE o.historical=0 AND o.status='current' AND o.last_seen=?
-            AND EXISTS (SELECT 1 FROM repo_runs rr WHERE rr.day=o.last_seen AND rr.slug=o.slug AND rr.state='completed')
-            AND NOT EXISTS (SELECT 1 FROM delivery_items di JOIN deliveries d ON d.day=di.day
-                WHERE di.kind='opportunity' AND di.item_id=o.id AND d.status='sent')
-            ORDER BY o.slug, o.first_seen, o.id""", (day,)).fetchall()
+        items = db.execute(PENDING_OPPORTUNITIES_SQL, (day,)).fetchall()
         if not repos and not items:
             return None
         lines = ["新仓库", ""]

@@ -55,6 +55,7 @@ class DailyRunTest(unittest.TestCase):
         self.assertEqual(view["scan"]["state"], "partial")
         self.assertEqual(len(calls), 4)
         self.assertEqual(len(view["opportunities"]), 1)
+        self.assertEqual(view["pending_mail_items"], 3)
         self.assertEqual(view["runs"][2]["state"], "failed")
         messages = []
         self.assertEqual(deliver(self.store, lambda *args: messages.append(args), DAY), "before_send_window")
@@ -70,6 +71,14 @@ class DailyRunTest(unittest.TestCase):
         self.assertEqual(len(calls), 4)
         self.assertEqual(deliver(self.store, lambda *args: messages.append(args), EVENING), "nothing_pending")
         self.assertEqual(len(messages), 1)
+
+    def test_board_explains_silent_day_after_dismissal_and_incomplete_reviews(self):
+        run_day(self.store, lambda: [("acme/new", "今日推荐")],
+                lambda slug, day: ReviewOutcome("incomplete", error="verification incomplete"), DAY)
+        self.store.ignore_repo("acme/new", True)
+        view = self.store.view(DAY.date().isoformat())
+        self.assertEqual(view["pending_mail_items"], 0)
+        self.assertEqual(deliver(self.store, lambda *args: self.fail("no new content"), EVENING), "nothing_pending")
 
     def test_next_day_keeps_opportunity_identity_and_suppresses_sent_repo(self):
         candidate = Candidate("同一机会", "https://github.com/earendil-works/pi/issues/42", "原始理由", "fix")

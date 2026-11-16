@@ -100,7 +100,10 @@ function render() {
   const mail = data.delivery;
   byId('mail-subtitle').textContent = mail
     ? ({sent:'今日邮件已发送',pending:'今日邮件待发送',sending:'今日邮件发送中',failed:'今日邮件发送失败',uncertain:'邮件投递状态待核对'}[mail.status] || '今日邮件状态未知') + (mail.error ? ` · ${mail.error}` : '')
-    : '今日尚无邮件投递记录';
+    : !data.scan ? '今日尚未扫描'
+    : data.scan.state === 'running' ? '今日审查中；有新内容会在 18:00 后发送'
+    : data.pending_mail_items ? `待推送 ${data.pending_mail_items} 项新内容 · 18:00 后发送`
+    : '今日无新仓库或已核验机会，不发送邮件';
   byId('scan-indicator').replaceChildren(badge(runLabel(scan), scan?.state === 'completed' ? 'good' : scan?.state === 'partial' ? 'warn' : 'neutral'));
   byId('trending-count').textContent = data.trending.length + data.sent_pending.length;
   byId('following-count').textContent = data.repositories.length;

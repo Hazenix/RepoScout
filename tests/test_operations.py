@@ -129,6 +129,29 @@ class OperationsTest(unittest.TestCase):
             self.assertIn('feat > fix > refactor/perf', command[-1])
             self.assertIn('最多 4', command[-1])
 
+    def test_codex_adapter_retries_transient_gh_auth_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            commands = []
+
+            def fake_run(command, **kwargs):
+                commands.append(command)
+                if command[:3] == ['gh', 'auth', 'status']:
+                    return subprocess.CompletedProcess(command, 1 if len(commands) == 1 else 0, '', '')
+                folder = Path(command[command.index('-C') + 1])
+                (folder / 'PR_HINT_REPORT_earendil-works-pi.md').write_text('完整报告', encoding='utf-8')
+                (folder / 'PR_HINT_PROGRESS_earendil-works-pi.md').write_text('完整进度', encoding='utf-8')
+                Path(command[command.index('--output-last-message') + 1]).write_text(json.dumps({
+                    'state': 'completed', 'candidates': [], 'cutoff': '2026-11-16 13:00 CST', 'error': ''
+                }), encoding='utf-8')
+                return subprocess.CompletedProcess(command, 0, '', '')
+
+            with patch('reposcout.adapters.subprocess.run', side_effect=fake_run), \
+                 patch('reposcout.adapters.time.sleep'):
+                outcome = CodexReviewer(Path(root))('earendil-works/pi', '2026-11-16')
+            self.assertEqual(outcome.state, 'completed')
+            self.assertEqual([command[:3] for command in commands[:2]],
+                             [['gh', 'auth', 'status'], ['gh', 'auth', 'status']])
+
     def test_launchd_has_startup_board_and_two_daily_times(self):
         searches = []
         def locate(name, path=None):
