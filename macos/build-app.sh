@@ -14,12 +14,11 @@ if [[ -e "$app_dir" ]]; then
 fi
 
 mkdir -p "$build_dir" "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
-swiftc -O -swift-version 5 -target arm64-apple-macosx14.0 \
-  -framework SwiftUI -framework AppKit \
-  "$project_dir/macos/Models.swift" \
-  "$project_dir/macos/Views.swift" \
-  "$project_dir/macos/RepoScoutApp.swift" \
-  -o "$app_dir/Contents/MacOS/RepoScout"
+swift build --package-path "$project_dir" --scratch-path "$build_dir/swiftpm" \
+  -c release --triple arm64-apple-macosx14.0 --product RepoScout
+binary_dir=$(swift build --package-path "$project_dir" --scratch-path "$build_dir/swiftpm" \
+  -c release --triple arm64-apple-macosx14.0 --show-bin-path)
+cp "$binary_dir/RepoScout" "$app_dir/Contents/MacOS/RepoScout"
 cp "$project_dir/macos/Info.plist" "$app_dir/Contents/Info.plist"
 
 swiftc "$project_dir/macos/MakeIcon.swift" -o "$build_dir/make-icon"

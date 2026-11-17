@@ -1,4 +1,5 @@
 import SwiftUI
+import MarkdownUI
 
 enum Palette {
     static let paper = Color(red: 0.969, green: 0.961, blue: 0.937)
@@ -701,6 +702,25 @@ private struct ReportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var content = ""
     @State private var error: String?
+    @State private var showsSource = false
+
+    private let reportTheme = Theme.gitHub.table { configuration in
+        VStack(alignment: .trailing, spacing: 6) {
+            Text("左右滚动查看完整表格")
+                .font(.caption)
+                .foregroundStyle(Palette.muted)
+            ScrollView(.horizontal, showsIndicators: true) {
+                // Reports contain long source paths, so keep columns wide enough to read.
+                configuration.label
+                    .frame(minWidth: 1400, alignment: .leading)
+                    .markdownTableBorderStyle(.init(color: Color.gray.opacity(0.25)))
+                    .markdownTableBackgroundStyle(
+                        .alternatingRows(Palette.surface, Palette.paper)
+                    )
+            }
+        }
+        .markdownMargin(top: 0, bottom: 16)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -709,6 +729,9 @@ private struct ReportSheet: View {
                     .font(.title2.weight(.semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer()
+                if !content.isEmpty {
+                    Button(showsSource ? "阅读" : "原文") { showsSource.toggle() }
+                }
                 Button("完成") { dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
@@ -722,12 +745,21 @@ private struct ReportSheet: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        Text(content)
-                            .font(.system(size: 13, design: .monospaced))
-                            .foregroundStyle(Palette.ink)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(24)
+                        Group {
+                            if showsSource {
+                                Text(content)
+                                    .font(.system(size: 13, design: .monospaced))
+                                    .foregroundStyle(Palette.ink)
+                            } else {
+                                Markdown(content)
+                                    .markdownTheme(reportTheme)
+                                    .tint(Palette.pine)
+                            }
+                        }
+                        .textSelection(.enabled)
+                        .frame(maxWidth: 940, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(28)
                     }
                 }
             }

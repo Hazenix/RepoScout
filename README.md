@@ -18,7 +18,7 @@ uv pip install --python .venv/bin/python -e .
 
 ## macOS 应用
 
-RepoScout 的日常界面是 SwiftUI 原生应用；扫描、邮件与数据继续由本机后台服务处理。应用关闭后定时任务照常运行。当前构建目标是 Apple Silicon、macOS 14 或更新版本，构建需要 Xcode：
+RepoScout 的日常界面是 SwiftUI 原生应用；扫描、邮件与数据继续由本机后台服务处理。应用关闭后定时任务照常运行。当前构建目标是 Apple Silicon、macOS 14 或更新版本，构建需要 Xcode；首次构建会由 Swift Package Manager 下载 Markdown 渲染依赖：
 
 ```sh
 macos/build-app.sh
@@ -28,6 +28,8 @@ open ~/Applications/RepoScout.app
 ```
 
 应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会三个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
+
+报告默认按 GitHub Flavored Markdown 阅读，标题、列表、表格、代码和链接会排版显示；右上角的「原文」可切回 Markdown 源码。
 
 在「发现」页粘贴公开 GitHub 仓库链接，或点击推荐仓库的「了解项目」，可查看它的用途、用法、配置条件、限制和 README 来源。简介由 Codex 根据公开文档按需生成并缓存在本机，可手动更新；此操作不关注仓库，也不触发完整 PR 审查或邮件。
 
