@@ -249,6 +249,13 @@ class Store:
                     PRIMARY KEY(day, kind, item_id)
                 );
                 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS project_briefs (
+                    slug TEXT PRIMARY KEY COLLATE NOCASE, state TEXT NOT NULL,
+                    purpose TEXT NOT NULL DEFAULT '', usage TEXT NOT NULL DEFAULT '',
+                    requirements TEXT NOT NULL DEFAULT '', caveats TEXT NOT NULL DEFAULT '',
+                    sources TEXT NOT NULL DEFAULT '[]', error TEXT NOT NULL DEFAULT '',
+                    updated_at TEXT NOT NULL
+                );
             """)
             for slug in INITIAL_REPOS:
                 db.execute("INSERT OR IGNORE INTO repositories(slug, followed, added_at) VALUES (?, 1, ?)", (slug, now_cn().isoformat()))
@@ -273,6 +280,49 @@ class Store:
             raise ValueError("无效的机会状态")
         with self.connect() as db:
             db.execute("UPDATE opportunities SET status=? WHERE id=?", (status, item_id))
+
+    def project_brief(self, value: str) -> dict | None:
+        slug = repo_slug(value)
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM project_briefs WHERE slug=?", (slug,)).fetchone()
+        if row is None:
+            return None
+        brief = dict(row)
+        brief["sources"] = json.loads(brief["sources"])
+        return brief
+
+    def request_project_brief(self, value: str, refresh: bool = False) -> tuple[dict, bool]:
+        """Claim one generation per repository; repeated requests reuse the cached result."""
+        slug = repo_slug(value)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM project_briefs WHERE slug=?", (slug,)).fetchone()
+            if row and (row["state"] == "running" or (row["state"] == "completed" and not refresh)):
+                brief = dict(row)
+                brief["sources"] = json.loads(brief["sources"])
+                return brief, False
+            db.execute("""INSERT INTO project_briefs(slug,state,updated_at) VALUES (?,'running',?)
+                ON CONFLICT(slug) DO UPDATE SET state='running', purpose='', usage='',
+                requirements='', caveats='', sources='[]', error='', updated_at=excluded.updated_at""",
+                (slug, now_cn().isoformat()))
+        return self.project_brief(slug), True
+
+    def finish_project_brief(self, value: str, result: dict | None = None, error: str = "") -> None:
+        slug = repo_slug(value)
+        result = result or {}
+        with self.connect() as db:
+            db.execute("""UPDATE project_briefs SET state=?, purpose=?, usage=?, requirements=?,
+                caveats=?, sources=?, error=?, updated_at=? WHERE slug=? AND state='running'""",
+                ("failed" if error else "completed", result.get("purpose", ""), result.get("usage", ""),
+                 result.get("requirements", ""), result.get("caveats", ""),
+                 json.dumps(result.get("sources", []), ensure_ascii=False), error,
+                 now_cn().isoformat(), slug))
+
+    def interrupt_project_briefs(self) -> None:
+        # 服务进程重启后，旧进程的后台分析不会继续；允许用户重新触发。
+        with self.connect() as db:
+            db.execute("""UPDATE project_briefs SET state='failed', error='本机服务重启，点击重新生成',
+                updated_at=? WHERE state='running'""", (now_cn().isoformat(),))
 
     def get_setting(self, key: str) -> str:
         with self.connect() as db:

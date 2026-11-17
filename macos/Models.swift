@@ -116,6 +116,24 @@ struct BoardState: Decodable {
     let pendingMailItems: Int
 }
 
+struct ProjectBrief: Decodable {
+    struct Source: Decodable, Identifiable {
+        let title: String
+        let url: String
+        var id: String { url }
+    }
+
+    let slug: String
+    let state: String
+    let purpose: String
+    let usage: String
+    let requirements: String
+    let caveats: String
+    let sources: [Source]
+    let error: String
+    let updatedAt: String
+}
+
 private struct APIError: Decodable {
     let error: String
 }
@@ -173,15 +191,7 @@ final class RepoScoutModel: ObservableObject {
         do {
             var payload = ["action": action, "value": value]
             if let status { payload["status"] = status }
-            var request = URLRequest(url: baseURL.appendingPathComponent("api/action"))
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            // 本机 API 对原生客户端也校验 Origin，保持与网页版相同的写入边界。
-            request.setValue(baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")),
-                             forHTTPHeaderField: "Origin")
-            request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-            let (data, response) = try await URLSession.shared.data(for: request)
-            try validate(response, data: data)
+            let data = try await post("api/action", payload: payload)
             state = try decoder.decode(BoardState.self, from: data)
             errorMessage = nil
             notice = switch action {
@@ -196,6 +206,20 @@ final class RepoScoutModel: ObservableObject {
             errorMessage = "操作未保存：\(error.localizedDescription)"
             return false
         }
+    }
+
+    func projectBrief(for value: String) async throws -> ProjectBrief? {
+        var components = URLComponents(url: baseURL.appendingPathComponent("api/brief"), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "value", value: value)]
+        let (data, response) = try await URLSession.shared.data(from: components.url!)
+        if (response as? HTTPURLResponse)?.statusCode == 404 { return nil }
+        try validate(response, data: data)
+        return try decoder.decode(ProjectBrief.self, from: data)
+    }
+
+    func requestProjectBrief(_ value: String, refresh: Bool = false) async throws -> ProjectBrief {
+        let data = try await post("api/brief", payload: ["value": value, "refresh": refresh])
+        return try decoder.decode(ProjectBrief.self, from: data)
     }
 
     func report(at path: String) async throws -> String {
@@ -238,5 +262,18 @@ final class RepoScoutModel: ObservableObject {
             let detail = (try? decoder.decode(APIError.self, from: data).error) ?? HTTPURLResponse.localizedString(forStatusCode: http.statusCode)
             throw ServiceError.response(http.statusCode, detail)
         }
+    }
+
+    private func post(_ path: String, payload: [String: Any]) async throws -> Data {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // 本机 API 对原生客户端也校验 Origin，保持与网页版相同的写入边界。
+        request.setValue(baseURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")),
+                         forHTTPHeaderField: "Origin")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response, data: data)
+        return data
     }
 }

@@ -29,6 +29,8 @@ open ~/Applications/RepoScout.app
 
 应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会三个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
 
+在「发现」页粘贴公开 GitHub 仓库链接，或点击推荐仓库的「了解项目」，可查看它的用途、用法、配置条件、限制和 README 来源。简介由 Codex 根据公开文档按需生成并缓存在本机，可手动更新；此操作不关注仓库，也不触发完整 PR 审查或邮件。
+
 换电脑时还需迁移本机数据、重新授权并切换定时任务。按[换机与发布说明](docs/MACOS_MIGRATION.md)操作；从仓库拉取源码不依赖 GitHub Release。
 
 ## 首次设置

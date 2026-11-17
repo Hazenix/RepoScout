@@ -15,10 +15,16 @@ struct ReportRequest: Identifiable {
     var id: String { path }
 }
 
+struct BriefRequest: Identifiable {
+    let value: String
+    var id: String { value }
+}
+
 struct WorkspaceView: View {
     @ObservedObject var model: RepoScoutModel
     @Environment(\.scenePhase) private var scenePhase
     @State private var reportRequest: ReportRequest?
+    @State private var briefRequest: BriefRequest?
 
     var body: some View {
         NavigationSplitView {
@@ -46,9 +52,9 @@ struct WorkspaceView: View {
                         }
                         switch model.selection ?? .trending {
                         case .trending:
-                            TrendingView(state: state, model: model)
+                            TrendingView(state: state, model: model, openBrief: openBrief)
                         case .following:
-                            FollowingView(state: state, model: model, openReport: openReport)
+                            FollowingView(state: state, model: model, openReport: openReport, openBrief: openBrief)
                         case .opportunities:
                             OpportunitiesView(state: state, model: model)
                         }
@@ -81,6 +87,9 @@ struct WorkspaceView: View {
         .sheet(item: $reportRequest) { request in
             ReportSheet(request: request, model: model)
         }
+        .sheet(item: $briefRequest) { request in
+            BriefSheet(request: request, model: model)
+        }
         .task {
             await model.refresh()
             while !Task.isCancelled {
@@ -96,6 +105,10 @@ struct WorkspaceView: View {
 
     private func openReport(_ path: String, title: String) {
         reportRequest = ReportRequest(path: path, title: title)
+    }
+
+    private func openBrief(_ value: String) {
+        briefRequest = BriefRequest(value: value.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 }
 
@@ -176,15 +189,30 @@ private struct ErrorBanner: View {
 private struct TrendingView: View {
     let state: BoardState
     @ObservedObject var model: RepoScoutModel
+    let openBrief: (String) -> Void
+    @State private var repositoryURL = ""
 
     var body: some View {
         List {
+            Section("了解一个项目") {
+                HStack(spacing: 10) {
+                    TextField("粘贴 GitHub 仓库链接", text: $repositoryURL)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(explainRepository)
+                    Button("了解项目", action: explainRepository)
+                        .buttonStyle(.borderedProminent)
+                        .tint(Palette.pine)
+                        .disabled(repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.vertical, 5)
+            }
             Section {
                 if state.trending.isEmpty {
                     EmptyRow(title: "今天没有新的仓库推荐", detail: "当前榜单的仓库已关注、忽略或推送过。")
                 }
                 ForEach(state.trending) { repo in
-                    RepositoryChoiceRow(slug: repo.slug, description: repo.description, model: model)
+                    RepositoryChoiceRow(slug: repo.slug, description: repo.description,
+                                        model: model, openBrief: openBrief)
                 }
             } header: {
                 SectionHeading(title: "今日新仓库", count: state.trending.count)
@@ -194,7 +222,8 @@ private struct TrendingView: View {
                 Section {
                     ForEach(state.sentPending) { repo in
                         RepositoryChoiceRow(slug: repo.slug, description: repo.description,
-                                            footnote: "已在 \(repo.sentDay) 邮件中推送", model: model)
+                                            footnote: "已在 \(repo.sentDay) 邮件中推送", model: model,
+                                            openBrief: openBrief)
                     }
                 } header: {
                     SectionHeading(title: "已推送，待决定", count: state.sentPending.count)
@@ -222,6 +251,12 @@ private struct TrendingView: View {
         .scrollContentBackground(.hidden)
         .listStyle(.inset)
     }
+
+    private func explainRepository() {
+        let value = repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return }
+        openBrief(value)
+    }
 }
 
 private struct RepositoryChoiceRow: View {
@@ -229,6 +264,7 @@ private struct RepositoryChoiceRow: View {
     let description: String
     var footnote: String? = nil
     @ObservedObject var model: RepoScoutModel
+    let openBrief: (String) -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 18) {
@@ -247,6 +283,9 @@ private struct RepositoryChoiceRow: View {
                 }
             }
             Spacer(minLength: 10)
+            Button("了解项目") { openBrief(slug) }
+                .buttonStyle(.link)
+                .tint(Palette.pine)
             Button("关注") { Task { await model.perform("follow", value: slug) } }
                 .buttonStyle(.borderedProminent)
                 .tint(Palette.pine)
@@ -276,6 +315,7 @@ private struct FollowingView: View {
     let state: BoardState
     @ObservedObject var model: RepoScoutModel
     let openReport: (String, String) -> Void
+    let openBrief: (String) -> Void
     @State private var repositoryURL = ""
 
     var body: some View {
@@ -299,7 +339,7 @@ private struct FollowingView: View {
                     let run = state.runs.first { $0.slug.caseInsensitiveCompare(repo.slug) == .orderedSame }
                     let history = state.history.first { $0.slug.caseInsensitiveCompare(repo.slug) == .orderedSame }
                     FollowingRow(repository: repo, run: run, history: history, model: model,
-                                 openReport: openReport)
+                                 openReport: openReport, openBrief: openBrief)
                 }
             } header: {
                 SectionHeading(title: "已关注", count: state.repositories.count)
@@ -335,6 +375,7 @@ private struct FollowingRow: View {
     let history: HistoricalReport?
     @ObservedObject var model: RepoScoutModel
     let openReport: (String, String) -> Void
+    let openBrief: (String) -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -356,6 +397,7 @@ private struct FollowingRow: View {
             }
             Spacer(minLength: 10)
             VStack(alignment: .trailing, spacing: 6) {
+                Button("了解项目") { openBrief(repository.slug) }
                 if let path = run?.reportPath, !path.isEmpty {
                     Button("本轮报告") { openReport(path, "\(repository.slug) · 本轮报告") }
                 }
@@ -513,6 +555,143 @@ private struct EmptyRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 22)
+    }
+}
+
+private struct BriefSheet: View {
+    let request: BriefRequest
+    @ObservedObject var model: RepoScoutModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var brief: ProjectBrief?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(brief?.slug ?? request.value)
+                    .font(.title2.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                Spacer()
+                Button("完成") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+            }
+            .padding(22)
+            Divider()
+            Group {
+                if let error {
+                    ContentUnavailableView {
+                        Label("无法读取项目简介", systemImage: "exclamationmark.triangle")
+                    } description: {
+                        Text(error).textSelection(.enabled)
+                    } actions: {
+                        Button("重试") { Task { await generate(refresh: true) } }
+                    }
+                } else if let brief, brief.state == "failed" {
+                    ContentUnavailableView {
+                        Label("项目简介未生成", systemImage: "doc.questionmark")
+                    } description: {
+                        Text(brief.error).textSelection(.enabled)
+                    } actions: {
+                        Button("重新生成") { Task { await generate(refresh: true) } }
+                    }
+                } else if let brief, brief.state == "completed" {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            Text(brief.purpose)
+                                .font(.system(size: 20, weight: .medium, design: .serif))
+                                .foregroundStyle(Palette.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Divider()
+                            BriefField(title: "怎么用", value: brief.usage)
+                            BriefField(title: "需要准备", value: brief.requirements)
+                            BriefField(title: "注意", value: brief.caveats)
+                            Divider()
+                            HStack(spacing: 14) {
+                                Text("来源")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Palette.muted)
+                                ForEach(brief.sources) { source in
+                                    if let url = URL(string: source.url), url.scheme == "https" {
+                                        Link(source.title, destination: url)
+                                            .foregroundStyle(Palette.pine)
+                                    }
+                                }
+                                Spacer()
+                                Button("更新简介") { Task { await generate(refresh: true) } }
+                                    .buttonStyle(.link)
+                                    .foregroundStyle(Palette.pine)
+                            }
+                            .font(.caption)
+                            .tint(Palette.pine)
+                        }
+                        .frame(maxWidth: 700, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(30)
+                    }
+                } else {
+                    VStack(spacing: 12) {
+                        ProgressView("正在了解项目…")
+                        Text("读取 GitHub README 和配置文档，再整理成中文简介。")
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.muted)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .frame(minWidth: 650, minHeight: 480)
+        .background(Palette.surface)
+        .task(id: request.value) { await load() }
+    }
+
+    private func load() async {
+        do {
+            if let cached = try await model.projectBrief(for: request.value) {
+                brief = cached
+            } else {
+                brief = try await model.requestProjectBrief(request.value)
+            }
+            try await pollWhileRunning()
+        } catch where !Task.isCancelled {
+            self.error = error.localizedDescription
+        } catch {}
+    }
+
+    private func generate(refresh: Bool) async {
+        error = nil
+        brief = nil
+        do {
+            brief = try await model.requestProjectBrief(request.value, refresh: refresh)
+            try await pollWhileRunning()
+        } catch where !Task.isCancelled {
+            self.error = error.localizedDescription
+        } catch {}
+    }
+
+    private func pollWhileRunning() async throws {
+        while brief?.state == "running" && !Task.isCancelled {
+            try await Task.sleep(for: .seconds(3))
+            brief = try await model.projectBrief(for: request.value)
+        }
+    }
+}
+
+private struct BriefField: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.ink)
+            Text(value)
+                .font(.body)
+                .foregroundStyle(Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+        }
     }
 }
 

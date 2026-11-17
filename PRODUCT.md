@@ -28,7 +28,7 @@ Python 标准库与 SQLite 负责扫描、邮件和本机数据；SwiftUI 应用
 
 ## Capabilities and Constraints
 
-三个主视图：Trending 待决定、已关注仓库、PR 机会。首次仅关注 openbot、pi、OpenViking、deer-flow。关注与忽略仅影响本机。历史报告待复核。每日审查所有关注仓库；失败和未完成不可伪装为零机会。运行数据与凭据不进入代码仓库。
+三个主视图：Trending 待决定、已关注仓库、PR 机会。可按需了解公开 GitHub 项目的用途和使用条件；项目简介不参与 PR 审查或邮件。首次仅关注 openbot、pi、OpenViking、deer-flow。关注与忽略仅影响本机。历史报告待复核。每日审查所有关注仓库；失败和未完成不可伪装为零机会。运行数据与凭据不进入代码仓库。
 
 ## Evidence on Hand
 
