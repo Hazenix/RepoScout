@@ -18,7 +18,7 @@ uv pip install --python .venv/bin/python -e .
 
 ## macOS 应用
 
-RepoScout 的日常界面是 SwiftUI 原生应用；扫描、邮件与数据继续由本机后台服务处理。应用关闭后定时任务照常运行。构建需要 Xcode：
+RepoScout 的日常界面是 SwiftUI 原生应用；扫描、邮件与数据继续由本机后台服务处理。应用关闭后定时任务照常运行。当前构建目标是 Apple Silicon、macOS 14 或更新版本，构建需要 Xcode：
 
 ```sh
 macos/build-app.sh
@@ -28,6 +28,8 @@ open ~/Applications/RepoScout.app
 ```
 
 应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会三个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
+
+换电脑时还需迁移本机数据、重新授权并切换定时任务。按[换机与发布说明](docs/MACOS_MIGRATION.md)操作；从仓库拉取源码不依赖 GitHub Release。
 
 ## 首次设置
 
@@ -89,7 +91,7 @@ open ~/Applications/RepoScout.app
 .venv/bin/reposcout write-launchd /path/to/new-plist-directory
 ```
 
-检查生成的 Python 路径、`PATH`、运行数据目录后，再将 plist 放入 `~/Library/LaunchAgents/` 并用 `launchctl bootstrap` 加载。开机只补当天最新的一轮；睡眠唤醒和定时同时触发时由本机任务锁去重。Mac 关机期间的历史 Trending 榜单无法恢复。
+检查生成的 Python 路径、`PATH`、运行数据目录后，再将 plist 放入 `~/Library/LaunchAgents/` 并用 `launchctl bootstrap` 加载。完整命令和旧电脑停用步骤见[换机与发布说明](docs/MACOS_MIGRATION.md)。开机只补当天最新的一轮；睡眠唤醒和定时同时触发时由本机任务锁去重。Mac 关机期间的历史 Trending 榜单无法恢复。
 
 ## 备份与恢复
 
