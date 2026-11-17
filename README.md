@@ -16,6 +16,19 @@ uv pip install --python .venv/bin/python -e .
 
 运行数据默认位于 `~/Library/Application Support/RepoScout`，可用 `--data-dir` 或 `REPOSCOUT_HOME` 指向其他位置。运行数据、调研报告和凭据不要提交到 Git。
 
+## macOS 应用
+
+RepoScout 的日常界面是 SwiftUI 原生应用；扫描、邮件与数据继续由本机后台服务处理。应用关闭后定时任务照常运行。构建需要 Xcode：
+
+```sh
+macos/build-app.sh
+mkdir -p ~/Applications
+ditto dist/RepoScout.app ~/Applications/RepoScout.app
+open ~/Applications/RepoScout.app
+```
+
+应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会三个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
+
 ## 首次设置
 
 1. 在 GitHub CLI 走正式登录流程，并核对授予的权限：
@@ -44,7 +57,7 @@ uv pip install --python .venv/bin/python -e .
 
    旧报告的日期和原文保存在本机；机会标记为“待复核”，不会作为首次发现推送。重复导入不会生成重复卡片。
 
-4. 启动看板，访问 `http://127.0.0.1:8765`：
+4. 启动本机服务，再打开 macOS 应用。网页版 `http://127.0.0.1:8765` 保留为备用入口：
 
    ```sh
    .venv/bin/reposcout serve

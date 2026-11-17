@@ -4,11 +4,11 @@
 
 ## Platform
 
-web
+macOS 原生应用；本机网页版保留为备用入口
 
 ## Stack
 
-本轮采用 Python 标准库、SQLite 和本机 Web UI。规格未指定框架；此项是可替换的实现选择。
+Python 标准库与 SQLite 负责扫描、邮件和本机数据；SwiftUI 应用通过环回接口读取状态并执行操作。网页版保留为备用入口。
 
 ## Users
 
@@ -24,7 +24,7 @@ web
 
 ## Operating Context
 
-一台 Mac、本机浏览器、GitHub Trending、GitHub CLI、Codex CLI、macOS 钥匙串和 QQ SMTP。13:00 Asia/Shanghai 开始日审，18:00 后才发送日报。
+一台 Mac、原生应用窗口、GitHub Trending、GitHub CLI、Codex CLI、macOS 钥匙串和 QQ SMTP。13:00 Asia/Shanghai 开始日审，18:00 后才发送日报。
 
 ## Capabilities and Constraints
 
