@@ -20,6 +20,8 @@ struct RepoScoutApp: App {
                     .keyboardShortcut("2", modifiers: .command)
                 Button("机会") { model.selection = .opportunities }
                     .keyboardShortcut("3", modifiers: .command)
+                Button("PR 监控") { model.selection = .pullRequests }
+                    .keyboardShortcut("4", modifiers: .command)
             }
         }
     }

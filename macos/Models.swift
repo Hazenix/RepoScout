@@ -6,6 +6,7 @@ enum WorkspaceSection: String, CaseIterable, Identifiable {
     case trending
     case following
     case opportunities
+    case pullRequests
 
     var id: Self { self }
 
@@ -14,6 +15,7 @@ enum WorkspaceSection: String, CaseIterable, Identifiable {
         case .trending: "发现"
         case .following: "关注"
         case .opportunities: "机会"
+        case .pullRequests: "PR 监控"
         }
     }
 
@@ -22,6 +24,7 @@ enum WorkspaceSection: String, CaseIterable, Identifiable {
         case .trending: "safari"
         case .following: "bookmark"
         case .opportunities: "sparkle.magnifyingglass"
+        case .pullRequests: "chart.bar.xaxis"
         }
     }
 }
@@ -220,6 +223,18 @@ final class RepoScoutModel: ObservableObject {
     func requestProjectBrief(_ value: String, refresh: Bool = false) async throws -> ProjectBrief {
         let data = try await post("api/brief", payload: ["value": value, "refresh": refresh])
         return try decoder.decode(ProjectBrief.self, from: data)
+    }
+
+    func pullRequests(sync: Bool = false) async throws -> PullRequestSnapshot {
+        let data: Data
+        if sync {
+            data = try await post("api/prs", payload: [:])
+        } else {
+            let (body, response) = try await URLSession.shared.data(from: baseURL.appendingPathComponent("api/prs"))
+            try validate(response, data: body)
+            data = body
+        }
+        return try decoder.decode(PullRequestSnapshot.self, from: data)
     }
 
     func report(at path: String) async throws -> String {

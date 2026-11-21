@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from .brief import ProjectExplainer
 from .core import BRIEF_INTERRUPTED_ERROR, Store
+from .pulls import PullRequestMonitor
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
@@ -40,6 +41,7 @@ def serve(store: Store, port: int = 8765) -> None:
     brief_jobs: PriorityQueue[tuple[int, int, str]] = PriorityQueue()
     order = count()
     stopping = threading.Event()
+    pr_monitor = PullRequestMonitor(store)
 
     def enqueue_brief(slug: str, priority: int) -> None:
         brief_jobs.put((priority, next(order), slug))
@@ -96,6 +98,10 @@ def serve(store: Store, port: int = 8765) -> None:
             if path == "/api/state":
                 self._send(200, json.dumps(store.view(), ensure_ascii=False).encode(), "application/json; charset=utf-8")
                 return
+            if path == "/api/prs":
+                self._send(200, json.dumps(pr_monitor.snapshot(), ensure_ascii=False).encode(),
+                           "application/json; charset=utf-8")
+                return
             if path == "/api/brief":
                 try:
                     value = parse_qs(parsed.query)["value"][0]
@@ -134,7 +140,7 @@ def serve(store: Store, port: int = 8765) -> None:
             if origin != f"http://{host}" or host not in (f"127.0.0.1:{port}", f"localhost:{port}"):
                 self._send(403, b"Forbidden", "text/plain")
                 return
-            if self.path not in ("/api/action", "/api/brief"):
+            if self.path not in ("/api/action", "/api/brief", "/api/prs"):
                 self._send(404, b"Not Found", "text/plain")
                 return
             try:
@@ -149,6 +155,11 @@ def serve(store: Store, port: int = 8765) -> None:
                 return
             try:
                 payload = json.loads(self.rfile.read(length))
+                if self.path == "/api/prs":
+                    pr_monitor.refresh()
+                    self._send(202, json.dumps(pr_monitor.snapshot(), ensure_ascii=False).encode(),
+                               "application/json; charset=utf-8")
+                    return
                 if self.path == "/api/brief":
                     brief, started = store.request_project_brief(payload["value"], payload.get("refresh") is True)
                     if started or brief["state"] == "running":
@@ -177,13 +188,17 @@ def serve(store: Store, port: int = 8765) -> None:
 
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     store.interrupt_project_briefs()
-    threading.Thread(target=run_brief_jobs, daemon=True).start()
+    brief_worker = threading.Thread(target=run_brief_jobs, daemon=True)
+    brief_worker.start()
     prefetch_thread = threading.Thread(target=prefetch_briefs, daemon=True)
     prefetch_thread.start()
+    pr_monitor.start()
     print(f"RepoScout 看板：http://127.0.0.1:{port}")
     try:
         server.serve_forever()
     finally:
         stopping.set()
+        pr_monitor.close()
         prefetch_thread.join(timeout=2)
+        brief_worker.join(timeout=2)
         server.server_close()

@@ -76,6 +76,7 @@ class ProjectBriefTest(unittest.TestCase):
 
             result = {"purpose": "提前生成", "usage": "用法", "requirements": "无", "caveats": "无", "sources": []}
             with patch("reposcout.server.ProjectExplainer", return_value=lambda slug: result), \
+                 patch("reposcout.server.PullRequestMonitor"), \
                  patch("reposcout.server.ThreadingHTTPServer") as server:
                 server.return_value.serve_forever.side_effect = wait_for_brief
                 serve(store, port=8765)

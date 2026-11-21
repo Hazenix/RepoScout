@@ -14,7 +14,7 @@ let package = Package(
             dependencies: [.product(name: "MarkdownUI", package: "swift-markdown-ui")],
             path: "macos",
             exclude: ["Info.plist", "MakeIcon.swift", "build-app.sh"],
-            sources: ["Models.swift", "Views.swift", "RepoScoutApp.swift"]
+            sources: ["Models.swift", "Views.swift", "PullRequestDashboard.swift", "RepoScoutApp.swift"]
         ),
     ]
 )

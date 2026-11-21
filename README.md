@@ -27,7 +27,9 @@ ditto dist/RepoScout.app ~/Applications/RepoScout.app
 open ~/Applications/RepoScout.app
 ```
 
-应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会三个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
+应用在 Finder、Dock 和 Spotlight 中显示为 RepoScout。发现、关注、机会、PR 监控四个视图、仓库操作及完整报告都在原生窗口内；GitHub 证据链接会打开浏览器。应用默认连接 `http://127.0.0.1:8765`，首次使用前仍需完成下方邮箱与 GitHub 登录设置，并加载后台服务的 launchd 配置。连接失败时可在应用内尝试启动已安装的本机服务。开发时可用 `REPOSCOUT_API_URL` 指向隔离的测试服务。
+
+「PR 监控」展示当前 GitHub 账号发起的 PR 总数、仓库分布和状态，后台每 15 分钟同步并保留本机缓存。统计范围、筛选和换账号步骤见 [PR 监控说明](docs/PR_MONITOR.md)。
 
 报告默认按 GitHub Flavored Markdown 阅读，标题、列表、表格、代码和链接会排版显示；右上角的「原文」可切回 Markdown 源码。
 

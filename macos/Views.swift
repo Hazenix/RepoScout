@@ -47,7 +47,9 @@ struct WorkspaceView: View {
             Group {
                 if let state = model.state {
                     VStack(spacing: 0) {
-                        WorkspaceHeader(state: state, section: model.selection ?? .trending)
+                        if model.selection != .pullRequests {
+                            WorkspaceHeader(state: state, section: model.selection ?? .trending)
+                        }
                         if let error = model.errorMessage {
                             ErrorBanner(message: error) { Task { await model.refresh() } }
                         }
@@ -58,6 +60,8 @@ struct WorkspaceView: View {
                             FollowingView(state: state, model: model, openReport: openReport, openBrief: openBrief)
                         case .opportunities:
                             OpportunitiesView(state: state, model: model)
+                        case .pullRequests:
+                            PullRequestDashboard(model: model)
                         }
                     }
                 } else if model.isLoading {
