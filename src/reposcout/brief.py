@@ -6,6 +6,7 @@ import json
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from .core import repo_slug
 
@@ -43,10 +44,15 @@ class ProjectExplainer:
         sources = [{"title": name, "url": document["html_url"]} for name, document in documents]
         excerpts = []
         for name, document in documents:
-            if document.get("encoding") != "base64":
+            if document.get("encoding") == "base64":
+                content = base64.b64decode(document["content"]).decode("utf-8", errors="replace")
+            elif document.get("encoding") == "none" and isinstance(document.get("path"), str):
+                # GitHub 对超过 1 MB 的文件不返回 base64 正文，改用 raw media type。
+                path = quote(document["path"], safe="/")
+                content = self._github_raw(f"repos/{slug}/contents/{path}")
+            else:
                 raise RuntimeError(f"{name} 不是可读取的文本文件")
-            raw = base64.b64decode(document["content"])
-            excerpts.append(f"## {name}\n{raw.decode('utf-8', errors='replace')[:30000]}")
+            excerpts.append(f"## {name}\n{content[:30000]}")
 
         prompt = f"""请根据下面的公开 GitHub 项目资料，回答用户“这个项目是干嘛的”。
 项目：{slug}
@@ -99,3 +105,14 @@ caveats（重要的能力边界或限制；未提及就写“资料未说明”�
             return json.loads(result.stdout)
         except ValueError as exc:
             raise RuntimeError(f"gh api {endpoint} returned invalid JSON") from exc
+
+    @staticmethod
+    def _github_raw(endpoint: str) -> str:
+        command = ["gh", "api", "-H", "Accept: application/vnd.github.raw+json", endpoint]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=30)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"gh api {endpoint} raw timed out after 30 seconds") from exc
+        if result.returncode:
+            raise RuntimeError(f"gh api {endpoint} raw exited {result.returncode}: {result.stderr[-500:].strip()}")
+        return result.stdout

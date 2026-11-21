@@ -137,6 +137,33 @@ class ProjectBriefTest(unittest.TestCase):
         self.assertEqual(len(result["sources"]), 2)
         self.assertEqual(len(commands), 5)
 
+    def test_explainer_reads_large_readme_with_raw_media_type(self):
+        slug = "example/large"
+        readme = {"encoding": "none", "content": "", "path": "README.md",
+                  "html_url": f"https://github.com/{slug}/blob/main/README.md"}
+        raw_commands = []
+
+        def fake_run(command, **kwargs):
+            if command[:2] == ["gh", "api"]:
+                if "-H" in command:
+                    raw_commands.append(command)
+                    return subprocess.CompletedProcess(command, 0, "# Large project\nInstall with npm", "")
+                payload = {f"repos/{slug}": {"description": "Large project", "private": False},
+                           f"repos/{slug}/readme": readme,
+                           f"repos/{slug}/contents": []}[command[2]]
+                return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+            self.assertIn("Install with npm", kwargs["input"])
+            Path(command[command.index("--output-last-message") + 1]).write_text(json.dumps({
+                "purpose": "大型项目", "usage": "npm 安装", "requirements": "npm", "caveats": "资料未说明"
+            }), encoding="utf-8")
+            return subprocess.CompletedProcess(command, 0, "", "")
+
+        with patch("reposcout.brief.subprocess.run", side_effect=fake_run):
+            result = ProjectExplainer()(slug)
+        self.assertEqual(result["purpose"], "大型项目")
+        self.assertEqual(len(raw_commands), 1)
+        self.assertIn("Accept: application/vnd.github.raw+json", raw_commands[0])
+
     def test_private_repository_is_rejected_before_reading_source(self):
         with patch("reposcout.brief.subprocess.run", return_value=subprocess.CompletedProcess(
             ["gh", "api"], 0, json.dumps({"private": True}), "")) as run:
