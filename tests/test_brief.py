@@ -2,15 +2,85 @@ import base64
 import json
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from reposcout.brief import ProjectExplainer
-from reposcout.core import Store
+from reposcout.core import Store, now_cn
 
 
 class ProjectBriefTest(unittest.TestCase):
+    def test_visible_repositories_are_prepared_without_opening_a_brief(self):
+        from reposcout.server import prepare_visible_briefs
+
+        with tempfile.TemporaryDirectory() as root:
+            store = Store(Path(root))
+            day = now_cn().date().isoformat()
+            store.ignore_repo("example/ignored", True)
+            with store.connect() as db:
+                db.executemany("INSERT INTO trending(day,position,slug,description) VALUES (?,?,?,?)", [
+                    (day, 1, "example/visible", "Visible project"),
+                    (day, 2, "example/sent", "Sent project"),
+                    (day, 3, "example/ignored", "Ignored project"),
+                ])
+                db.execute("INSERT INTO recommendation_items(day,slug) VALUES (?,?)", (day, "example/visible"))
+                db.execute("INSERT INTO recommendation_items(day,slug) VALUES (?,?)", (day, "example/ignored"))
+                db.execute("INSERT INTO deliveries(day,status,message_id,subject,body) VALUES (?,?,?,?,?)",
+                           (day, "sent", "test-message", "test", "test"))
+                db.execute("INSERT INTO delivery_items(day,kind,item_id) VALUES (?,'repo',?)",
+                           (day, "example/sent"))
+            store.request_project_brief("nightly-labs/openbot")
+            store.finish_project_brief("nightly-labs/openbot", {
+                "purpose": "已缓存", "usage": "用法", "requirements": "无", "caveats": "无", "sources": []
+            })
+            store.request_project_brief("earendil-works/pi")
+            store.interrupt_project_briefs()
+
+            generated = []
+            def finish(slug):
+                generated.append(slug)
+                store.finish_project_brief(slug, {
+                    "purpose": "提前生成", "usage": "用法", "requirements": "无", "caveats": "无", "sources": []
+                })
+
+            prepare_visible_briefs(store, finish)
+            self.assertEqual(store.project_brief("example/visible")["state"], "completed")
+            self.assertEqual(store.project_brief("example/sent")["state"], "completed")
+            self.assertIn("earendil-works/pi", generated)
+            self.assertNotIn("nightly-labs/openbot", generated)
+            self.assertIsNone(store.project_brief("example/ignored"))
+            prepared_count = len(generated)
+            prepare_visible_briefs(store, finish)
+            self.assertEqual(len(generated), prepared_count)
+
+    def test_server_prefetches_a_visible_brief_without_a_request(self):
+        from reposcout.server import serve
+
+        with tempfile.TemporaryDirectory() as root:
+            store = Store(Path(root))
+            day = now_cn().date().isoformat()
+            with store.connect() as db:
+                db.execute("INSERT INTO trending(day,position,slug,description) VALUES (?,?,?,?)",
+                           (day, 1, "example/visible", "Visible project"))
+                db.execute("INSERT INTO recommendation_items(day,slug) VALUES (?,?)", (day, "example/visible"))
+
+            def wait_for_brief():
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    if (store.project_brief("example/visible") or {}).get("state") == "completed":
+                        return
+                    time.sleep(0.01)
+                self.fail("visible brief was not prepared on server startup")
+
+            result = {"purpose": "提前生成", "usage": "用法", "requirements": "无", "caveats": "无", "sources": []}
+            with patch("reposcout.server.ProjectExplainer", return_value=lambda slug: result), \
+                 patch("reposcout.server.ThreadingHTTPServer") as server:
+                server.return_value.serve_forever.side_effect = wait_for_brief
+                serve(store, port=8765)
+            self.assertEqual(store.project_brief("example/visible")["purpose"], "提前生成")
+
     def test_brief_claim_is_cached_and_interrupted_jobs_can_retry(self):
         with tempfile.TemporaryDirectory() as root:
             store = Store(Path(root))

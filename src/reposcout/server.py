@@ -3,27 +3,75 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import sys
 import threading
+from itertools import count
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from queue import Empty, PriorityQueue
+from typing import Callable
 from urllib.parse import parse_qs, unquote, urlparse
 
 from .brief import ProjectExplainer
-from .core import Store
+from .core import BRIEF_INTERRUPTED_ERROR, Store
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 
 
+def prepare_visible_briefs(store: Store, enqueue: Callable[[str], None]) -> None:
+    """Queue missing briefs for repositories shown in the current board."""
+    state = store.view()
+    seen = set()
+    for section in ("trending", "sent_pending", "repositories"):
+        for repository in state[section]:
+            slug = repository["slug"]
+            if slug in seen:
+                continue
+            seen.add(slug)
+            cached = store.project_brief(slug)
+            if cached and not (cached["state"] == "failed" and cached["error"] == BRIEF_INTERRUPTED_ERROR):
+                continue
+            brief, started = store.request_project_brief(slug)
+            if started:
+                enqueue(brief["slug"])
+
+
 def serve(store: Store, port: int = 8765) -> None:
-    brief_slot = threading.Semaphore(1)
+    brief_jobs: PriorityQueue[tuple[int, int, str]] = PriorityQueue()
+    order = count()
+    stopping = threading.Event()
+
+    def enqueue_brief(slug: str, priority: int) -> None:
+        brief_jobs.put((priority, next(order), slug))
 
     def generate_brief(slug: str) -> None:
-        # 简介与每日扫描分开执行；串行调用 Codex，避免多次点击挤占调研资源。
-        with brief_slot:
+        try:
+            store.finish_project_brief(slug, ProjectExplainer()(slug))
+        except Exception as exc:
+            store.finish_project_brief(slug, error=f"{type(exc).__name__}: {exc}"[-1500:])
+
+    def run_brief_jobs() -> None:
+        # 单个 worker 串行调用 Codex；手动打开的项目优先于后台预生成队列。
+        while not stopping.is_set():
             try:
-                store.finish_project_brief(slug, ProjectExplainer()(slug))
+                _, _, slug = brief_jobs.get(timeout=1)
+            except Empty:
+                continue
+            try:
+                if (store.project_brief(slug) or {}).get("state") == "running":
+                    generate_brief(slug)
             except Exception as exc:
-                store.finish_project_brief(slug, error=f"{type(exc).__name__}: {exc}"[-1500:])
+                print(f"项目简介后台任务失败 {slug}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            finally:
+                brief_jobs.task_done()
+
+    def prefetch_briefs() -> None:
+        while not stopping.is_set():
+            try:
+                prepare_visible_briefs(store, lambda slug: enqueue_brief(slug, 1))
+            except Exception as exc:
+                print(f"预生成项目简介失败: {type(exc).__name__}: {exc}", file=sys.stderr)
+            stopping.wait(60)
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, body: bytes, content_type: str) -> None:
@@ -103,8 +151,8 @@ def serve(store: Store, port: int = 8765) -> None:
                 payload = json.loads(self.rfile.read(length))
                 if self.path == "/api/brief":
                     brief, started = store.request_project_brief(payload["value"], payload.get("refresh") is True)
-                    if started:
-                        threading.Thread(target=generate_brief, args=(brief["slug"],), daemon=True).start()
+                    if started or brief["state"] == "running":
+                        enqueue_brief(brief["slug"], 0)
                     self._send(202 if brief["state"] == "running" else 200,
                                json.dumps(brief, ensure_ascii=False).encode(), "application/json; charset=utf-8")
                     return
@@ -129,8 +177,13 @@ def serve(store: Store, port: int = 8765) -> None:
 
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     store.interrupt_project_briefs()
+    threading.Thread(target=run_brief_jobs, daemon=True).start()
+    prefetch_thread = threading.Thread(target=prefetch_briefs, daemon=True)
+    prefetch_thread.start()
     print(f"RepoScout 看板：http://127.0.0.1:{port}")
     try:
         server.serve_forever()
     finally:
+        stopping.set()
+        prefetch_thread.join(timeout=2)
         server.server_close()

@@ -21,6 +21,7 @@ INITIAL_REPOS = (
     "volcengine/OpenViking", "bytedance/deer-flow",
 )
 REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+BRIEF_INTERRUPTED_ERROR = "本机服务重启，点击重新生成"
 ISSUE_PATTERN = re.compile(r"^https://github\.com/([^/]+)/([^/]+)/(issues|pull)/(\d+)$")
 ELIGIBLE_TRENDING_SQL = """
     SELECT t.slug,t.description,t.position FROM trending t
@@ -319,10 +320,10 @@ class Store:
                  now_cn().isoformat(), slug))
 
     def interrupt_project_briefs(self) -> None:
-        # 服务进程重启后，旧进程的后台分析不会继续；允许用户重新触发。
+        # 服务重启后旧任务不会继续；标记中断，供可见项目重新排队。
         with self.connect() as db:
-            db.execute("""UPDATE project_briefs SET state='failed', error='本机服务重启，点击重新生成',
-                updated_at=? WHERE state='running'""", (now_cn().isoformat(),))
+            db.execute("""UPDATE project_briefs SET state='failed', error=?,
+                updated_at=? WHERE state='running'""", (BRIEF_INTERRUPTED_ERROR, now_cn().isoformat()))
 
     def get_setting(self, key: str) -> str:
         with self.connect() as db:
